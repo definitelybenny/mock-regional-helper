@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Mock Regional Helper
 // @namespace    mock-regional-helper
-// @version      0.6.2
+// @version      1.0.0
 // @description  Tracks a VGC mock regional run on the Showdown Bo3 ladder: records sets, saves replays, tracks ELO, and formats a Discord post.
 // @homepageURL  https://github.com/definitelybenny/mock-regional-helper
 // @updateURL    https://raw.githubusercontent.com/definitelybenny/mock-regional-helper/main/mock-regional-helper.user.js
@@ -1726,7 +1726,7 @@
 	const REPLAY_TIMEOUT = 20000;
 	const TAB_ROOT_ID = 'mrh-tab-root';
 	const REPLAY_HOST = 'https://replay.pokemonshowdown.com/';
-	const VERSION = '0.6.2';
+	const VERSION = '1.0.0';
 	const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
 	const state = Core.loadState(GM_getValue(STORE_KEY, null));
@@ -2442,6 +2442,7 @@ html.dark #mrh-sidebar{background:#2b2b2b;color:#ddd}
 .mrh-view .mrh-nav{display:flex;gap:2px;justify-content:flex-end;margin:-6px 0 6px;font-size:12px}
 .mrh-view .mrh-nav-item{background:none;border:0;border-radius:3px;padding:2px 8px;cursor:pointer;color:inherit;opacity:.75;font:inherit}
 .mrh-view .mrh-nav-item:hover{opacity:1;text-decoration:underline}
+.mrh-view .mrh-version{margin-right:auto;align-self:center;opacity:.5;font-size:11px}
 .mrh-view .mrh-nav-on{opacity:1;font-weight:bold;background:rgba(128,128,128,.18)}
 .mrh-view .mrh-small{font-size:12px}
 .mrh-view .mrh-table{border-collapse:collapse;width:100%;margin:4px 0 8px;font-size:12px}
@@ -3836,6 +3837,7 @@ html.dark #mrh-sidebar{background:#2b2b2b;color:#ddd}
 			},
 		});
 		return el('div', { className: 'mrh-nav' }, [
+			el('span', { className: 'mrh-version', text: 'v' + VERSION, title: 'Mock Regional Helper version' }),
 			item('run', state.run ? 'Run' : 'New run'),
 			item('history', 'History'),
 			item('stats', 'Stats'),
