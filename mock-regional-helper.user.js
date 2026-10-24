@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Mock Regional Helper
 // @namespace    mock-regional-helper
-// @version      1.0.0
+// @version      1.0.1
 // @description  Tracks a VGC mock regional run on the Showdown Bo3 ladder: records sets, saves replays, tracks ELO, and formats a Discord post.
 // @homepageURL  https://github.com/definitelybenny/mock-regional-helper
 // @updateURL    https://raw.githubusercontent.com/definitelybenny/mock-regional-helper/main/mock-regional-helper.user.js
@@ -1726,7 +1726,7 @@
 	const REPLAY_TIMEOUT = 20000;
 	const TAB_ROOT_ID = 'mrh-tab-root';
 	const REPLAY_HOST = 'https://replay.pokemonshowdown.com/';
-	const VERSION = '1.0.0';
+	const VERSION = '1.0.1';
 	const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
 	const state = Core.loadState(GM_getValue(STORE_KEY, null));
