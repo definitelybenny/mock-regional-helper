@@ -1,0 +1,43 @@
+name: Bug report
+description: Something isn't working (sets not tracked, replays not saved, tab missing, ...)
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Script version
+      description: Shown in the top-left of the Mock Regional tab (e.g. v1.0.0).
+      placeholder: v1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options: [Chrome, Edge, Firefox, Safari, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Showdown client
+      description: The new client has a "BETA" logo in the top-left.
+      options: [New client (BETA), Old client, Not sure]
+  - type: textarea
+    id: console
+    attributes:
+      label: Console lines
+      description: Open the browser console (F12 → Console), type `MockRegional` in the filter box, and paste the lines here.
+      render: text
+  - type: textarea
+    id: other
+    attributes:
+      label: Other extensions
+      description: Other Showdown extensions or userscripts you use (e.g. Showdex).

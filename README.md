@@ -1,8 +1,33 @@
 # Mock Regional Helper
 
-A Tampermonkey userscript for running a VGC "mock regional" on the Pokemon Showdown Bo3 ladder. It records each set: opponent, game results, replay links, ELO, and the opponent's team. It works out your stage (Day 1 / Day 2 / Top Cut / Eliminated / Champion) and builds a Discord post for you to paste.
+[![Latest release](https://img.shields.io/github/v/release/definitelybenny/mock-regional-helper)](https://github.com/definitelybenny/mock-regional-helper/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-It only watches traffic, saves replays, and formats the post. It never picks moves or queues for you.
+Run a VGC **mock regional** on the Pokémon Showdown Bo3 ladder without the busywork. Play your sets; the script records every game, saves the replays, tracks your ELO and your Day 1 / Day 2 / Top Cut run, and builds the Discord post (or an image report card) for you.
+
+**[Install Mock Regional Helper](https://raw.githubusercontent.com/definitelybenny/mock-regional-helper/main/mock-regional-helper.user.js)** (needs [Tampermonkey](https://www.tampermonkey.net/); see [Install](#install))
+
+<p align="center"><img src="docs/screenshots/report-card.png" alt="Report card for a mock regional run" width="600"></p>
+
+## Features
+
+- **Automatic set tracking.** Every Bo3 set in the format is recorded: opponent, game-by-game results, set score, and the opponent's open team sheet.
+- **Replays saved for you.** Each game's replay is uploaded and linked automatically, with a clear saved / failed indicator.
+- **Run stages.** Your record decides Day 1, Day 2 (at X-2 or better), Top Cut, Eliminated or Champion. Rounds and loss limits are configurable.
+- **ELO tracking.** Start and end rating for each set and for the whole run.
+- **Notes.** A quick "how'd it go" note and 1-5 rating after each set.
+- **Leads and bring-4.** Your leads, your four brought, and the opponent's leads for every game.
+- **Discord-ready output.** Copy a formatted text post, split to fit Discord's limit, or copy/download a PNG report card.
+- **History and stats.** Past runs, record per team, win rate against each opponent Pokémon and per lead pair, ELO across runs.
+- **Team-switch warning.** A heads-up if you queue with a different team mid-run, so you can leave that set out.
+- **Import and backup.** Add sets from replays if you started the run late, and export or import everything as a file.
+- Lives in a real **Mock Regional** tab in Showdown (new and old client; works alongside Showdex).
+
+| Run view | Stats |
+|---|---|
+| <img src="docs/screenshots/run.png" alt="Run view with sets, replays and notes" width="400"> | <img src="docs/screenshots/stats.png" alt="Stats view" width="400"> |
+
+It only watches the battle traffic, saves replays and formats posts. **It never picks moves, queues, or plays for you.**
 
 ## Install
 
@@ -32,9 +57,32 @@ Rules: you are eliminated as soon as your Swiss losses go over the max (so X-2 i
 
 The run is saved in Tampermonkey storage, so reloading the page doesn't lose it.
 
-If something looks wrong (for example sets not being picked up, or a sidebar instead of the tab), open the browser console (F12) and send the lines starting with `[MockRegional]`. They say which mode was chosen and why.
+## Troubleshooting
+
+- **No badge or tab:** make sure Tampermonkey is enabled for the site, and on Chrome/Edge that **Allow User Scripts** is on. Then reload Showdown.
+- **Sets not being recorded:** check that a run is active (not ended; use **Resume run**) and that you're playing the format set in Settings.
+- **Anything else:** [open an issue](https://github.com/definitelybenny/mock-regional-helper/issues/new/choose). Include the lines from the browser console (F12 → Console, filter for `MockRegional`); they show what the script saw and why.
+
+## Privacy
+
+Everything the script records stays in your browser (Tampermonkey storage). There's no server and no account. The only things that leave your machine:
+
+- **Pokémon Showdown:** saving replays (the same as clicking "Upload and share replay"), and reading your public ladder rating and replays.
+- **pokepast.es:** your team is uploaded to make a paste link for the Discord post. Turn this off in Settings (**Upload team to pokepast.es**) if you'd rather not.
+
+Nothing is posted to Discord for you. You copy and paste it yourself.
+
+## Disclaimer
+
+Not affiliated with or endorsed by Pokémon Showdown, Smogon, Nintendo, Game Freak, The Pokémon Company or Play! Pokémon. Pokémon names and sprites belong to their respective owners. The script never automates gameplay. It only reads battle messages and saves replays you could save yourself.
+
+## License
+
+[MIT](LICENSE)
 
 ## Battle data export (schema v1)
+
+*For tool developers; regular players can skip this.*
 
 **Backup → Export battle data** (or **Export battle data** on an archived run) writes one `.json` file. It contains the raw evidence only. Spreads are not inferred: opponent team sheets have no EVs, and damage, speed and roll inference is left to the importer.
 
