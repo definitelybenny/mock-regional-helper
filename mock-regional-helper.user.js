@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Mock Regional Helper
 // @namespace    mock-regional-helper
-// @version      1.0.1
+// @version      1.1.1
 // @description  Tracks a VGC mock regional run on the Showdown Bo3 ladder: records sets, saves replays, tracks ELO, and formats a Discord post.
 // @homepageURL  https://github.com/definitelybenny/mock-regional-helper
 // @updateURL    https://raw.githubusercontent.com/definitelybenny/mock-regional-helper/main/mock-regional-helper.user.js
@@ -41,6 +41,8 @@
 			usePokepaste: true,
 			/** add "led A+B (+C D) vs X+Y" to each game line in the Discord post */
 			discordLineups: true,
+			/** keep playing the remaining Swiss rounds after going over the loss threshold */
+			playOn: false,
 		};
 		const DISCORD_LIMIT = 2000;
 		const STAT_ORDER = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
@@ -280,8 +282,10 @@
 		 * Compute stage from completed sets.
 		 * Elimination: losses exceed the threshold during Swiss, or any loss in top cut.
 		 * Ties count toward the record only (not losses).
+		 * With playOn, going over the loss threshold in Swiss does not end the run: the stage stays
+		 * 'Eliminated' (non-terminal) while the remaining Swiss rounds are played for points; there is no top cut.
 		 */
-		function computeStage(sets, settings) {
+		function computeStage(sets, settings, playOn) {
 			const swiss = swissRounds(settings);
 			const done = sets.filter(s => s.result);
 			let wins = 0, losses = 0, ties = 0;
@@ -299,19 +303,55 @@
 					} else if (r === 'W' && i - swiss + 1 >= settings.topCutRounds) {
 						stage = 'Champion';
 					}
-				} else if (losses > settings.lossThreshold) {
+				} else if (losses > settings.lossThreshold && !playOn) {
 					stage = 'Eliminated';
 					eliminatedIn = phaseOfRound(i, settings);
-				} else if (i === swiss - 1 && settings.topCutRounds <= 0) {
-					stage = 'Finished';
+				} else {
+					if (losses > settings.lossThreshold && !eliminatedIn) eliminatedIn = phaseOfRound(i, settings);
+					// Playing on after elimination ends with the phase you were eliminated in (Day 1 or Day 2).
+					if (eliminatedIn && i === playUntil(eliminatedIn, settings) - 1) stage = 'Eliminated';
+					else if (!eliminatedIn && i === swiss - 1 && settings.topCutRounds <= 0) stage = 'Finished';
 				}
 			}
 			const terminal = !!stage;
 			if (!stage) {
 				const next = done.length;
-				stage = next < settings.day1Rounds ? 'Day 1' : next < swiss ? 'Day 2' : 'Top Cut';
+				stage = eliminatedIn ? 'Eliminated' : next < settings.day1Rounds ? 'Day 1' : next < swiss ? 'Day 2' : 'Top Cut';
 			}
-			return { stage, terminal, eliminatedIn, wins, losses, ties, completed: done.length };
+			return { stage, terminal, eliminatedIn, wins, losses, ties, completed: done.length, playingOn: !!playOn && !!eliminatedIn && !terminal, playUntil: eliminatedIn ? playUntil(eliminatedIn, settings) : null };
+		}
+
+		/** Rounds played in total when playing on after being eliminated in the given phase. */
+		function playUntil(eliminatedIn, settings) {
+			return eliminatedIn === 'Day 1' ? settings.day1Rounds : swissRounds(settings);
+		}
+
+		/** Does this run keep going past elimination (its own choice, or the default setting)? */
+		function playsOn(run, settings) {
+			return !!((run && run.playOn) || (settings && settings.playOn));
+		}
+
+		function stageOf(run, settings) {
+			return computeStage(run.sets || [], settings, playsOn(run, settings));
+		}
+
+		/** Elimination in Swiss with rounds left and not yet playing on: the user may choose to continue. */
+		function canPlayOn(run, settings) {
+			if (!run || playsOn(run, settings)) return false;
+			const info = computeStage(run.sets || [], settings, false);
+			return info.stage === 'Eliminated' && info.completed < playUntil(info.eliminatedIn, settings) && !/^(Top|Finals)/.test(info.eliminatedIn || '');
+		}
+
+		/** Continue playing the remaining Swiss rounds after elimination. */
+		function continuePlaying(state) {
+			const run = state.run;
+			if (!run || !canPlayOn(run, state.settings)) return false;
+			run.playOn = true;
+			run.ended = false;
+			run.endedAt = null;
+			run.endReason = null;
+			run.endElo = null;
+			return true;
 		}
 
 		function recordText(info) {
@@ -496,7 +536,7 @@
 		function canAddSets(state) {
 			const run = state.run;
 			if (!run || run.ended) return false;
-			return !computeStage(run.sets, state.settings).terminal;
+			return !stageOf(run, state.settings).terminal;
 		}
 
 		function findSet(run, id) {
@@ -525,7 +565,7 @@
 		function noteUntracked(state, track, room, setId, effects) {
 			const run = state.run;
 			if (!run || !run.ended || room.result || track.untracked[setId]) return;
-			if (computeStage(run.sets, state.settings).terminal) return;
+			if (stageOf(run, state.settings).terminal) return;
 			track.untracked[setId] = true;
 			effects.push({ type: 'untracked', setId });
 		}
@@ -540,7 +580,7 @@
 			set.result = result;
 			set.endedAt = Date.now();
 			effects.push({ type: 'setEnded', setId: set.id });
-			const info = computeStage(state.run.sets, state.settings);
+			const info = stageOf(state.run, state.settings);
 			if (info.terminal && !state.run.ended) {
 				state.run.ended = true;
 				state.run.endedAt = Date.now();
@@ -883,7 +923,8 @@
 		function syncRunEnded(state) {
 			const run = state.run;
 			if (!run || run.endReason === 'manual') return;
-			const info = computeStage(run.sets, state.settings);
+			if (run.playOn && !computeStage(run.sets || [], state.settings, true).eliminatedIn) run.playOn = false; // undone back below elimination
+			const info = stageOf(run, state.settings);
 			if (info.terminal && !run.ended) {
 				run.ended = true;
 				run.endedAt = Date.now();
@@ -915,7 +956,7 @@
 		/** Undo a manual "End run" (only if the record isn't already terminal). */
 		function resumeRun(state) {
 			const run = state.run;
-			if (!run || !run.ended || computeStage(run.sets, state.settings).terminal) return false;
+			if (!run || !run.ended || stageOf(run, state.settings).terminal) return false;
 			run.ended = false;
 			run.endedAt = null;
 			run.endReason = null;
@@ -1169,7 +1210,7 @@
 		/** One line per run for the History list. */
 		function runSummary(run, settings) {
 			const st = runSettings(run, settings);
-			const info = computeStage(run.sets || [], st);
+			const info = stageOf(run, st);
 			const end = run.endElo != null ? run.endElo : run.currentElo;
 			return {
 				id: run.id,
@@ -1551,7 +1592,7 @@
 		/** Everything the report card shows, plus its height. opts: { showNotes } */
 		function reportCardModel(run, settings, opts) {
 			const showNotes = !(opts && opts.showNotes === false);
-			const info = computeStage(run.sets, settings);
+			const info = stageOf(run, settings);
 			const end = run.endElo != null ? run.endElo : run.currentElo;
 			const headline = info.stage === 'Champion' ? 'Champion' :
 				info.stage === 'Eliminated' ? `Eliminated · ${info.eliminatedIn}` :
@@ -1609,7 +1650,7 @@
 		/** Build the post as logical blocks (header, team, one per set). */
 		function discordBlocks(run, settings, opts) {
 			opts = opts || {};
-			const info = computeStage(run.sets, settings);
+			const info = stageOf(run, settings);
 			const blocks = [];
 			let header = `**${run.event}** — ${run.player || 'unknown player'}\n`;
 			if (opts.pasteUrl) header += `Team: <${opts.pasteUrl}>\n`;
@@ -1696,7 +1737,7 @@
 			toID, unescapeHtml, decodeFrame, decodeOutgoing, parseBlock, splitLine, parseIdentity,
 			parseRatingLine, parseReplayPopup, replayBaseForRoom, replayMatchesRoom,
 			unpackTeam, exportTeam, packedSpecies, stripSpreads,
-			roundLabel, computeStage, recordText, statusText,
+			swissRounds, roundLabel, computeStage, stageOf, playsOn, canPlayOn, continuePlaying, recordText, statusText,
 			newState, loadState, newRun, newTracker, handleIncoming, handleOutgoing,
 			markResult, undoLastSet, endRun, resumeRun, syncRunEnded, setScore, teamsDiffer, decideTeam,
 			replayIdFromUrl, parseReplayGame, groupImportedGames, isImported, placeholderSets, importSets,
@@ -1726,7 +1767,7 @@
 	const REPLAY_TIMEOUT = 20000;
 	const TAB_ROOT_ID = 'mrh-tab-root';
 	const REPLAY_HOST = 'https://replay.pokemonshowdown.com/';
-	const VERSION = '1.0.1';
+	const VERSION = '1.1.1';
 	const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
 	const state = Core.loadState(GM_getValue(STORE_KEY, null));
@@ -2530,7 +2571,7 @@ html.dark #mrh-sidebar{background:#2b2b2b;color:#ddd}
 	}
 
 	function stageInfo() {
-		return state.run ? Core.computeStage(state.run.sets, state.settings) : null;
+		return state.run ? Core.stageOf(state.run, state.settings) : null;
 	}
 
 	function eloLine(run) {
@@ -2778,6 +2819,7 @@ html.dark #mrh-sidebar{background:#2b2b2b;color:#ddd}
 		const actions = el('div', { className: 'mrh-actions', style: 'justify-content:center' }, [
 			btn(ui.busy || 'Copy for Discord', () => copyForDiscord(state.run, state.settings), { className: 'button mrh-primary', disabled: !!ui.busy }),
 			btn('Report card', () => openCard(state.run), { className: 'button mrh-primary' }),
+			Core.canPlayOn(run, state.settings) ? btn('Continue playing', update(() => { Core.continuePlaying(state); ui.chunks = null; ui.showDetails = false; }), { className: 'button mrh-primary' }) : null,
 			btn('New run', newRun, { className: 'button mrh-primary' }),
 		]);
 		const wrap = el('div', null, [
@@ -2817,6 +2859,16 @@ html.dark #mrh-sidebar{background:#2b2b2b;color:#ddd}
 			stat(Core.statusText(info, run), 'Stage'),
 			stat(eloLine(run), 'ELO'),
 		]));
+		if (info.playingOn) {
+			wrap.appendChild(el('p', { className: 'mrh-muted', text: `Out of contention (${info.eliminatedIn}), playing on for practice. ${swissLeft(info)} round(s) left in ${info.eliminatedIn}.` }));
+			wrap.appendChild(el('div', { className: 'mrh-actions' }, [
+				btn('End run & start new', () => {
+					if (!confirm('End this run and start a new one? The current run is kept in History.')) return;
+					Core.endRun(state);
+					newRun(true);
+				}, { className: 'button mrh-primary' }),
+			]));
+		}
 		wrap.appendChild(renderTeam());
 
 		if (ui.pendingNote) {
@@ -3079,6 +3131,10 @@ html.dark #mrh-sidebar{background:#2b2b2b;color:#ddd}
 		return section('import', 'Import past sets', children);
 	}
 
+	function swissLeft(info) {
+		return Math.max(0, (info.playUntil || Core.swissRounds(state.settings)) - info.completed);
+	}
+
 	function renderSettings() {
 		const s = state.settings;
 		const num = (key, label) => {
@@ -3105,13 +3161,14 @@ html.dark #mrh-sidebar{background:#2b2b2b;color:#ddd}
 			num('topCutRounds', 'Top cut rounds (3 = Top 8)'),
 			check('includeSpreads', 'Include spreads (EVs/IVs/nature) in the shared team'),
 			check('usePokepaste', 'Upload team to pokepast.es'),
+			check('playOn', 'After going over the loss limit, keep playing the Swiss rounds for practice'),
 			check('discordLineups', 'Leads and bring per game in the Discord post (short form)'),
 		]);
 	}
 
 	/** Archive the current run into History and go back to the start screen. */
-	function newRun() {
-		if (!confirm('Start a new run? The current one is kept in History.')) return;
+	function newRun(skipConfirm) {
+		if (skipConfirm !== true && !confirm('Start a new run? The current one is kept in History.')) return;
 		runHistory = Core.archiveRun(runHistory, state.run, state.settings);
 		saveHistory();
 		log('archived run', state.run && state.run.id);
@@ -3917,7 +3974,7 @@ html.dark #mrh-sidebar{background:#2b2b2b;color:#ddd}
 			return renderHistory();
 		}
 		const settings = Core.runSettings(run, state.settings);
-		const info = Core.computeStage(run.sets, settings);
+		const info = Core.stageOf(run, settings);
 		const stat = (value, label) => el('div', { className: 'mrh-stat' }, [el('b', { text: value }), el('span', { text: label })]);
 		const wrap = el('div', null, [
 			el('p', null, [linkBtn('← History', () => { ui.view = 'history'; ui.chunks = null; render(); })]),
