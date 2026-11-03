@@ -1,0 +1,103 @@
+{
+  "$schema": "https://definitelybenny.dev/showcase.schema.json",
+  "id": "mock-regional",
+  "order": 2,
+  "status": "live",
+  "question": "How do you practice for a Regional without leaving the house?",
+  "game": "Pokémon VGC · Showdown",
+  "name": "Mock Regional Helper",
+  "note": "it keeps score so you can just play",
+  "tilt": "1.3deg",
+  "what": "A Tampermonkey script for Pokémon Showdown. Ladder Bo3 sets like normal and it treats them as a Regional: it records every game, saves the replays, tracks your ELO, and moves you through Day 1, Day 2 and Top Cut. At the end it writes the Discord post or draws a report card.",
+  "useWhen": [
+    "A real event is coming and you want tournament day to feel familiar.",
+    "You want to know which leads actually win, not which ones feel like they win.",
+    "Your friends want proof of the run."
+  ],
+  "thenAsk": [
+    "Your record decides your stage. How would you write that rule as code?",
+    "What would your win rate per lead pair say about your team?",
+    "It exports every battle as JSON. What would you build on top of that?"
+  ],
+  "links": [
+    {
+      "label": "How to install",
+      "href": "https://github.com/definitelybenny/mock-regional-helper#install",
+      "primary": true
+    },
+    {
+      "label": "See the code",
+      "href": "https://github.com/definitelybenny/mock-regional-helper"
+    }
+  ],
+  "next": "showdown-restyler",
+  "detail": {
+    "status": "Live · Pokémon Showdown",
+    "lede": "Mock Regional Helper. Play your Bo3 sets on the Showdown ladder and it runs the event around you: replays, ELO, Day 1 to Top Cut, and a post ready for Discord.",
+    "what": {
+      "title": "A Regional, minus the travel.",
+      "body": [
+        "A mock regional is a practice run: you play the ladder as if it were an event and see how far your team would get. The hard part is the bookkeeping. This script does all of it while you play.",
+        "It only watches the battle traffic, saves replays and formats posts. It never picks moves, queues or plays for you."
+      ],
+      "callout": "the report card is my favorite part",
+      "figure": {
+        "type": "image",
+        "src": "docs/screenshots/report-card.png",
+        "alt": "A Mock Regional Helper report card showing a run’s record, stage, ELO, team, and one row per set",
+        "caption": "the report card it draws for Discord"
+      }
+    },
+    "how": {
+      "title": "Start a run, then just play.",
+      "steps": [
+        {
+          "title": "Install it",
+          "body": "Add the Tampermonkey extension, then install the script from the repo. On Chrome and Edge, turn on Allow User Scripts for Tampermonkey."
+        },
+        {
+          "title": "Start a run",
+          "body": "Open Showdown, tap the Mock Regional badge, name your event and press Start run."
+        },
+        {
+          "title": "Ladder as usual",
+          "body": "Play Bo3 sets in the format. Every game, replay, lead and note is recorded for you."
+        },
+        {
+          "title": "Share it",
+          "body": "When the run ends, copy the post for Discord or grab the report card image."
+        }
+      ],
+      "headsUp": "Everything stays in your browser. The only things that leave are replays you save to Showdown and, if you leave it on, a pokepast.es link for your team."
+    },
+    "works": {
+      "title": "Your record is the whole state machine.",
+      "body": [
+        "Every finished set is a win, a loss or a tie. Walk through them in order, count the losses, and the record tells you where you are: Day 1, Day 2, Top Cut, Eliminated or Champion.",
+        "Go over the loss limit in Swiss and you’re out. Any loss in top cut ends it. That’s the rule a real Regional runs on, in about a dozen lines."
+      ],
+      "code": "for (let i = 0; i < done.length && !stage; i++) {\n  const r = done[i].result;\n  if (r === 'W') wins++;\n  else if (r === 'L') losses++;\n  else ties++;\n\n  if (i >= swiss) {\n    // top cut: one loss and you're out\n    if (r === 'L') stage = 'Eliminated';\n    else if (i - swiss + 1 >= settings.topCutRounds) stage = 'Champion';\n  } else if (losses > settings.lossThreshold) {\n    // X-2 is still alive, X-3 is not\n    stage = 'Eliminated';\n  }\n}",
+      "callout": "trimmed from computeStage; the real one also lets you play on after you’re out"
+    },
+    "ideas": {
+      "title": "Where you could take it next.",
+      "items": [
+        {
+          "tag": "pick up where it stops",
+          "title": "Work out the spreads",
+          "body": "The battle export has every line of every game but no EVs. Damage rolls and speed ties could fill them in. The script leaves that job open on purpose."
+        },
+        {
+          "tag": "plug it in",
+          "title": "Dock it in the Restyler",
+          "body": "The Showdown Restyler has a panel API, and registering the Mock Regional tab as a panel is next on the list."
+        },
+        {
+          "tag": "go bigger",
+          "title": "A friends’ leaderboard",
+          "body": "Everyone exports their runs. Merge the files and settle whose team really is best."
+        }
+      ]
+    }
+  }
+}

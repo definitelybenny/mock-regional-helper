@@ -2,5 +2,6 @@ node_modules/
 *.log
 *.json
 !package.json
+!showcase.json
 .DS_Store
 Thumbs.db
